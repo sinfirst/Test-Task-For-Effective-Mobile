@@ -25,7 +25,7 @@ func main() {
 	}
 
 	db := database.NewPGDB(conf, logger)
-	a := app.NewApp(logger, conf)
+	a := app.NewApp(db, conf, logger)
 	router := router.NewRouter(a)
 	if conf.DatabaseDsn != "" {
 		err := database.InitMigrations(conf, logger)
