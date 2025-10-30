@@ -6,9 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/pressly/goose/v3"
 	"github.com/sinfirst/Test-Task-For-Effective-Mobile/internal/config"
 	"github.com/sinfirst/Test-Task-For-Effective-Mobile/internal/handlers"
@@ -36,7 +38,38 @@ func NewPGDB(conf config.Config, logger zap.SugaredLogger) *PGDB {
 		return nil
 	}
 
+	exists, err := databaseExists(db, conf.Database.Name)
+	if err != nil {
+		return nil
+	}
+
+	if !exists {
+		_, err = db.Exec(context.Background(), fmt.Sprintf("CREATE DATABASE %s", conf.Database.Name))
+		if err != nil {
+			return nil
+		}
+	}
+	db, err = pgxpool.New(context.Background(), conf.Database.DataBaseDSN+"/"+conf.Database.Name)
+
+	if err != nil {
+		logger.Errorw("Problem with connecting to db: ", err)
+		return nil
+	}
+
 	return &PGDB{logger: logger, db: db}
+}
+
+func databaseExists(db *pgxpool.Pool, dbName string) (bool, error) {
+	query := `SELECT 1 FROM pg_database WHERE datname = $1`
+	var exists int
+	err := db.QueryRow(context.Background(), query, dbName).Scan(&exists)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
 }
 
 func (p *PGDB) CreateInDB(ctx context.Context, sub models.SubJSON) (int, error) {
@@ -46,7 +79,20 @@ func (p *PGDB) CreateInDB(ctx context.Context, sub models.SubJSON) (int, error) 
 		VALUES ($1, $2, $3, $4, $5)
 		RETURNING id
 	`
-	err := p.db.QueryRow(ctx, query, sub.ServiceName, sub.Price, sub.UserUUID, sub.StartDate, sub.EndDate).Scan(&id)
+	start, end, err := handlers.DateParse(sub.StartDate, sub.EndDate)
+	if err != nil {
+		p.logger.Errorw("Problem with parse date: ", err)
+		return 0, err
+	}
+
+	var endDB interface{}
+	if end.IsZero() {
+		endDB = nil
+	} else {
+		endDB = end
+	}
+
+	err = p.db.QueryRow(ctx, query, sub.ServiceName, sub.Price, sub.UserUUID, start, endDB).Scan(&id)
 	if err != nil {
 		p.logger.Errorw("Problem with create in db: ", err)
 		return 0, err
@@ -57,11 +103,12 @@ func (p *PGDB) CreateInDB(ctx context.Context, sub models.SubJSON) (int, error) 
 
 func (p *PGDB) ReadFromDB(ctx context.Context, id string) (models.SubJSON, error) {
 	var sub models.SubJSON
+	var start time.Time
+	var end sql.NullTime
 
-	query := `SELECT (name_service, cost_per_month, user_uuid, date_start, date_end) FROM subs WHERE id = $1`
+	query := `SELECT id, name_service, cost_per_month, user_uuid, date_start, date_end FROM subs WHERE id = $1`
 	row := p.db.QueryRow(ctx, query, id)
-	err := row.Scan(&sub.ServiceName, &sub.Price, &sub.UserUUID, &sub.StartDate, &sub.EndDate)
-
+	err := row.Scan(&sub.ID, &sub.ServiceName, &sub.Price, &sub.UserUUID, &start, &end)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return models.SubJSON{}, fmt.Errorf("not found")
@@ -69,6 +116,14 @@ func (p *PGDB) ReadFromDB(ctx context.Context, id string) (models.SubJSON, error
 		p.logger.Errorw("Problem with read from db: ", err)
 		return models.SubJSON{}, err
 	}
+
+	sub.StartDate = TimeToMonthYearString(start)
+	if end.Valid {
+		sub.EndDate = TimeToMonthYearString(end.Time)
+	} else {
+		sub.EndDate = ""
+	}
+
 	return sub, nil
 }
 
@@ -81,6 +136,19 @@ func (p *PGDB) UpdateInDB(ctx context.Context, sub models.SubJSON) error {
 
 	if !exist {
 		return fmt.Errorf("not found")
+	}
+
+	start, end, err := handlers.DateParse(sub.StartDate, sub.EndDate)
+	if err != nil {
+		p.logger.Errorw("Problem with parse date: ", err)
+		return err
+	}
+
+	var endDB interface{}
+	if end.IsZero() {
+		endDB = nil
+	} else {
+		endDB = end
 	}
 
 	query := "UPDATE subs SET "
@@ -108,13 +176,13 @@ func (p *PGDB) UpdateInDB(ctx context.Context, sub models.SubJSON) error {
 	if sub.StartDate != "" {
 		paramCount++
 		query += fmt.Sprintf("date_start = $%d, ", paramCount)
-		args = append(args, sub.StartDate)
+		args = append(args, start)
 	}
 
 	if sub.EndDate != "" {
 		paramCount++
 		query += fmt.Sprintf("date_end = $%d, ", paramCount)
-		args = append(args, sub.EndDate)
+		args = append(args, endDB)
 	}
 
 	query = strings.TrimSuffix(query, ", ")
@@ -158,11 +226,11 @@ func (p *PGDB) DeleteFromDB(ctx context.Context, id string) error {
 	return nil
 }
 
-func (p *PGDB) ListFromDB(ctx context.Context, id string) ([]models.SubJSON, error) {
+func (p *PGDB) ListFromDB(ctx context.Context, user_id string) ([]models.SubJSON, error) {
 	var subs []models.SubJSON
 
-	query := `SELECT (id, name_service, cost_per_month, date_start, date_end) FROM subs WHERE user_uuid = $1`
-	rows, err := p.db.Query(ctx, query, id)
+	query := `SELECT id, name_service, cost_per_month, user_uuid, date_start, date_end FROM subs WHERE user_uuid = $1`
+	rows, err := p.db.Query(ctx, query, user_id)
 
 	if err != nil {
 		p.logger.Errorw("Problem with create list from db: ", err)
@@ -172,11 +240,21 @@ func (p *PGDB) ListFromDB(ctx context.Context, id string) ([]models.SubJSON, err
 
 	for rows.Next() {
 		var sub models.SubJSON
+		var start time.Time
+		var end sql.NullTime
 
-		err := rows.Scan(&sub.ServiceName, &sub.Price, &sub.UserUUID, &sub.StartDate, &sub.EndDate)
+		err := rows.Scan(&sub.ID, &sub.ServiceName, &sub.Price, &sub.UserUUID, &start, &end)
 		if err != nil {
 			p.logger.Errorw("Problem with create list from db: ", err)
 			return nil, err
+		}
+
+		sub.StartDate = TimeToMonthYearString(start)
+		sub.StartDate = TimeToMonthYearString(start)
+		if end.Valid {
+			sub.EndDate = TimeToMonthYearString(end.Time)
+		} else {
+			sub.EndDate = ""
 		}
 
 		subs = append(subs, sub)
@@ -188,34 +266,35 @@ func (p *PGDB) ListFromDB(ctx context.Context, id string) ([]models.SubJSON, err
 func (p *PGDB) CostSumSubFromDB(ctx context.Context, req models.SubJSON) (int, error) {
 	var totalCost int
 	query := `
-        SELECT COALESCE(SUM(price), 0) as total_cost
+        SELECT COALESCE(SUM(cost_per_month), 0) as total_cost
         FROM subs
-        WHERE date_start <= $1 
-        AND (end_date IS NULL OR end_date >= $2)
+        WHERE date_start >= $1 
+        AND (date_end IS NULL OR date_end <= $2)
     `
-	endTime, startTime, err := handlers.DateParse(req.StartDate, req.EndDate)
+	startTime, endTime, err := handlers.DateParse(req.StartDate, req.EndDate)
 	if err != nil {
 		p.logger.Errorw("Problem with parse date: ", err)
 		return 0, err
 	}
 
-	args := []interface{}{endTime, startTime}
+	args := []interface{}{startTime, endTime}
 	argCounter := 3
 
 	if req.UserUUID != "" {
-		query += fmt.Sprintf(" AND user_id = $%d", argCounter)
+		query += fmt.Sprintf(" AND user_uuid = $%d", argCounter)
 		args = append(args, req.UserUUID)
 		argCounter++
 	}
 
 	if req.ServiceName != "" {
-		query += fmt.Sprintf(" AND service_name = $%d", argCounter)
+		query += fmt.Sprintf(" AND name_service = $%d", argCounter)
 		args = append(args, req.ServiceName)
 		argCounter++
 	}
 
 	err = p.db.QueryRow(ctx, query, args...).Scan(&totalCost)
 	if err != nil {
+		p.logger.Errorw("Problem with calc cost: ", err)
 		return 0, fmt.Errorf("failed to calculate total cost: %w", err)
 	}
 
@@ -237,7 +316,7 @@ func (p *PGDB) checkSubExistByID(ctx context.Context, id string) (bool, error) {
 }
 
 func InitMigrations(conf config.Config, logger zap.SugaredLogger) error {
-	db, err := sql.Open("pgx", conf.Database.DataBaseDSN)
+	db, err := sql.Open("pgx", conf.Database.DataBaseDSN+"/"+conf.Database.Name)
 	if err != nil {
 		return err
 	}
@@ -249,4 +328,8 @@ func InitMigrations(conf config.Config, logger zap.SugaredLogger) error {
 
 	logger.Infow("Migrations applied successfully")
 	return nil
+}
+
+func TimeToMonthYearString(t time.Time) string {
+	return t.Format("01-2006")
 }

@@ -17,7 +17,7 @@ type Storage interface {
 	ReadFromDB(ctx context.Context, id string) (models.SubJSON, error)
 	UpdateInDB(ctx context.Context, sub models.SubJSON) error
 	DeleteFromDB(ctx context.Context, id string) error
-	ListFromDB(ctx context.Context, id string) ([]models.SubJSON, error)
+	ListFromDB(ctx context.Context, user_id string) ([]models.SubJSON, error)
 	CostSumSubFromDB(ctx context.Context, req models.SubJSON) (int, error)
 }
 

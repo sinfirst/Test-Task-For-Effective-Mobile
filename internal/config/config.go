@@ -6,13 +6,10 @@ import (
 	"log"
 	"os"
 	"strconv"
-	"sync"
 
 	"github.com/joho/godotenv"
 	"gopkg.in/yaml.v3"
 )
-
-var once sync.Once
 
 // Config структура
 type Config struct {
@@ -54,7 +51,7 @@ func LoadConfig(configPath string) (*Config, error) {
 
 	overrideFromEnv(config)
 	config.Server.Address = fmt.Sprintf("%s:%d", config.Server.Host, config.Server.Port)
-	config.Database.DataBaseDSN = fmt.Sprintf("%s://%s:%s@%s:%d/%s", "postgres", config.Database.User, config.Database.Password, config.Database.Host, config.Database.Port, config.Database.Name)
+	config.Database.DataBaseDSN = fmt.Sprintf("%s://%s:%s@%s:%d", "postgres", config.Database.User, config.Database.Password, config.Database.Host, config.Database.Port)
 
 	return config, nil
 }

@@ -6,11 +6,13 @@ services:
     ports:
       - "8080:8080"
     environment:
-      - DB_HOST=postgres
-      - DB_PORT=5432
-      - DB_NAME=subscriptions
-      - DB_USER=postgres
-      - DB_PASSWORD=password
+      - DB_HOST=${db_host}
+      - DB_PORT=${db_port}
+      - DB_NAME=${db_name}
+      - DB_USER=${db_user}
+      - DB_PASSWORD=${db_password}
+      - SERVER_HOST=${server_host}
+      - SERVER_POER=${server_port}
     depends_on:
       - postgres
     networks:
@@ -19,19 +21,16 @@ services:
   postgres:
     image: postgres:15-alpine
     environment:
-      - POSTGRES_DB=subscriptions
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=${db_name}
+      - POSTGRES_USER=${db_user}
+      - POSTGRES_PASSWORD=${db_password}
     ports:
-      - "5432:5432"
+      - 5432:5432
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./migrations:/docker-entrypoint-initdb.d
+      - ./saveDataBase:/var/lib/postgresql/data
     networks:
       - app-network
 
-volumes:
-  postgres_data:
 
 networks:
   app-network:

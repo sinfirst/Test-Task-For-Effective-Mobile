@@ -6,13 +6,18 @@ import (
 )
 
 func DateParse(start, end string) (time.Time, time.Time, error) {
-	startTime, err := time.Parse("mm-YYYY", start)
+	var startTime, endTime time.Time
+	startTime, err := time.Parse("01-2006", start)
 	if err != nil {
-		return time.Now(), time.Now(), fmt.Errorf("invalid start_month format: %w", err)
+		return time.Time{}, time.Time{}, fmt.Errorf("invalid start_month format: %w", err)
 	}
-	endTime, err := time.Parse("mm-YYYY", end)
-	if err != nil {
-		return time.Now(), time.Now(), fmt.Errorf("invalid end_month format: %w", err)
+
+	if end != "" {
+		endTime, err = time.Parse("01-2006", end)
+		if err != nil {
+			return time.Time{}, time.Time{}, fmt.Errorf("invalid end_month format: %w", err)
+		}
+		return startTime, endTime, nil
 	}
-	return startTime, endTime, nil
+	return startTime, time.Time{}, nil
 }
