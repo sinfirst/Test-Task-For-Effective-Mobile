@@ -38,6 +38,7 @@ func (a *App) CreateSub(w http.ResponseWriter, r *http.Request) {
 	json.NewDecoder(r.Body).Decode(&req)
 
 	id, err := a.storage.CreateInDB(r.Context(), req)
+
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -50,6 +51,7 @@ func (a *App) CreateSub(w http.ResponseWriter, r *http.Request) {
 func (a *App) ReadSub(w http.ResponseWriter, r *http.Request) {
 	var appErr models.AppError
 	id := chi.URLParam(r, "id")
+
 	resp, err := a.storage.ReadFromDB(r.Context(), id)
 
 	if errors.As(err, &appErr); appErr == models.ErrNotFound {

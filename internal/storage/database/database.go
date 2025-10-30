@@ -13,7 +13,6 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/pressly/goose/v3"
 	"github.com/sinfirst/Test-Task-For-Effective-Mobile/internal/config"
-	"github.com/sinfirst/Test-Task-For-Effective-Mobile/internal/handlers"
 	"github.com/sinfirst/Test-Task-For-Effective-Mobile/internal/models"
 	"go.uber.org/zap"
 )
@@ -79,7 +78,7 @@ func (p *PGDB) CreateInDB(ctx context.Context, sub models.SubJSON) (int, error) 
 		VALUES ($1, $2, $3, $4, $5)
 		RETURNING id
 	`
-	start, end, err := handlers.DateParse(sub.StartDate, sub.EndDate)
+	start, end, err := dateParse(sub.StartDate, sub.EndDate)
 	if err != nil {
 		p.logger.Errorw("Problem with parse date: ", err)
 		return 0, err
@@ -117,9 +116,9 @@ func (p *PGDB) ReadFromDB(ctx context.Context, id string) (models.SubJSON, error
 		return models.SubJSON{}, err
 	}
 
-	sub.StartDate = TimeToMonthYearString(start)
+	sub.StartDate = timeToMonthYearString(start)
 	if end.Valid {
-		sub.EndDate = TimeToMonthYearString(end.Time)
+		sub.EndDate = timeToMonthYearString(end.Time)
 	} else {
 		sub.EndDate = ""
 	}
@@ -138,7 +137,7 @@ func (p *PGDB) UpdateInDB(ctx context.Context, sub models.SubJSON) error {
 		return fmt.Errorf("not found")
 	}
 
-	start, end, err := handlers.DateParse(sub.StartDate, sub.EndDate)
+	start, end, err := dateParse(sub.StartDate, sub.EndDate)
 	if err != nil {
 		p.logger.Errorw("Problem with parse date: ", err)
 		return err
@@ -249,10 +248,10 @@ func (p *PGDB) ListFromDB(ctx context.Context, user_id string) ([]models.SubJSON
 			return nil, err
 		}
 
-		sub.StartDate = TimeToMonthYearString(start)
-		sub.StartDate = TimeToMonthYearString(start)
+		sub.StartDate = timeToMonthYearString(start)
+		sub.StartDate = timeToMonthYearString(start)
 		if end.Valid {
-			sub.EndDate = TimeToMonthYearString(end.Time)
+			sub.EndDate = timeToMonthYearString(end.Time)
 		} else {
 			sub.EndDate = ""
 		}
@@ -271,7 +270,7 @@ func (p *PGDB) CostSumSubFromDB(ctx context.Context, req models.SubJSON) (int, e
         WHERE date_start >= $1 
         AND (date_end IS NULL OR date_end <= $2)
     `
-	startTime, endTime, err := handlers.DateParse(req.StartDate, req.EndDate)
+	startTime, endTime, err := dateParse(req.StartDate, req.EndDate)
 	if err != nil {
 		p.logger.Errorw("Problem with parse date: ", err)
 		return 0, err
@@ -330,6 +329,23 @@ func InitMigrations(conf config.Config, logger zap.SugaredLogger) error {
 	return nil
 }
 
-func TimeToMonthYearString(t time.Time) string {
+func timeToMonthYearString(t time.Time) string {
 	return t.Format("01-2006")
+}
+
+func dateParse(start, end string) (time.Time, time.Time, error) {
+	var startTime, endTime time.Time
+	startTime, err := time.Parse("01-2006", start)
+	if err != nil {
+		return time.Time{}, time.Time{}, fmt.Errorf("invalid start_month format: %w", err)
+	}
+
+	if end != "" {
+		endTime, err = time.Parse("01-2006", end)
+		if err != nil {
+			return time.Time{}, time.Time{}, fmt.Errorf("invalid end_month format: %w", err)
+		}
+		return startTime, endTime, nil
+	}
+	return startTime, time.Time{}, nil
 }
