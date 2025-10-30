@@ -7,8 +7,8 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/sinfirst/Test-Task-For-Effective-Mobile/config"
 	"github.com/sinfirst/Test-Task-For-Effective-Mobile/internal/app"
-	"github.com/sinfirst/Test-Task-For-Effective-Mobile/internal/config"
 	"github.com/sinfirst/Test-Task-For-Effective-Mobile/internal/middleware/logging"
 	"github.com/sinfirst/Test-Task-For-Effective-Mobile/internal/router"
 	"github.com/sinfirst/Test-Task-For-Effective-Mobile/internal/storage/database"
@@ -25,7 +25,7 @@ func main() {
 	}
 
 	db := database.NewPGDB(conf, logger)
-	a := app.NewApp(db, conf, logger)
+	a := app.NewApp(db, conf)
 	router := router.NewRouter(a)
 	if conf.DatabaseDsn != "" {
 		err := database.InitMigrations(conf, logger)

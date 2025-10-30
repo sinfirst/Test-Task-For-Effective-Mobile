@@ -12,12 +12,12 @@ func NewRouter(a *app.App) *chi.Mux {
 	router := chi.NewRouter()
 
 	router.Use(logging.WithLogging)
-	router.Get("/api/read", a.ReadSub)
-	router.Get("/api/list", a.ListSub)
-	router.Post("/api/create", a.CreateSub)
-	router.Put("/api/update", a.UpdateSub)
-	router.Delete("/api/delete", a.DeleteSub)
+	router.Get("/{id}", a.ReadSub)
+	router.Get("/list/{user_id}", a.ListSub)
+	router.Post("/", a.CreateSub)
+	router.Put("/", a.UpdateSub)
+	router.Delete("/", a.DeleteSub)
 
-	router.Post("/api/calc", a.CalcSumSub)
+	router.Post("/calc", a.CalcSumSub)
 	return router
 }
