@@ -10,7 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/pressly/goose/v3"
-	"github.com/sinfirst/Test-Task-For-Effective-Mobile/config"
+	"github.com/sinfirst/Test-Task-For-Effective-Mobile/internal/config"
 	"github.com/sinfirst/Test-Task-For-Effective-Mobile/internal/handlers"
 	"github.com/sinfirst/Test-Task-For-Effective-Mobile/internal/models"
 	"go.uber.org/zap"
@@ -22,7 +22,7 @@ type PGDB struct {
 }
 
 func NewPGDB(conf config.Config, logger zap.SugaredLogger) *PGDB {
-	db, err := pgxpool.New(context.Background(), conf.DatabaseDsn)
+	db, err := pgxpool.New(context.Background(), conf.Database.DataBaseDSN)
 
 	if err != nil {
 		logger.Errorw("Problem with connecting to db: ", err)
@@ -237,11 +237,7 @@ func (p *PGDB) checkSubExistByID(ctx context.Context, id string) (bool, error) {
 }
 
 func InitMigrations(conf config.Config, logger zap.SugaredLogger) error {
-	if conf.DatabaseDsn == "" {
-		return fmt.Errorf("DBDsn isn't set")
-	}
-
-	db, err := sql.Open("pgx", conf.DatabaseDsn)
+	db, err := sql.Open("pgx", conf.Database.DataBaseDSN)
 	if err != nil {
 		return err
 	}

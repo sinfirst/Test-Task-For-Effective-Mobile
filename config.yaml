@@ -1,12 +1,11 @@
 database:
-  host: "localhost"
+  host: "postgres"
   port: 5432
-  name: "subscriptions_db"
+  name: "subscriptions"
   user: "postgres"
   password: "password"
-  ssl_mode: "disable"
 
 server:
+  host: "localhost"
   port: 8080
-  timeout: 30s
 

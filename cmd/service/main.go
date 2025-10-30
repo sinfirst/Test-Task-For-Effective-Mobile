@@ -7,8 +7,8 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/sinfirst/Test-Task-For-Effective-Mobile/config"
 	"github.com/sinfirst/Test-Task-For-Effective-Mobile/internal/app"
+	"github.com/sinfirst/Test-Task-For-Effective-Mobile/internal/config"
 	"github.com/sinfirst/Test-Task-For-Effective-Mobile/internal/middleware/logging"
 	"github.com/sinfirst/Test-Task-For-Effective-Mobile/internal/router"
 	"github.com/sinfirst/Test-Task-For-Effective-Mobile/internal/storage/database"
@@ -19,24 +19,23 @@ func main() {
 	defer cancel()
 
 	logger := logging.NewLogger()
-	conf, err := config.NewConfig()
+	conf, err := config.LoadConfig("config.yaml")
 	if err != nil {
 		logger.Fatalw("can't init config", err)
 	}
 
-	db := database.NewPGDB(conf, logger)
-	a := app.NewApp(db, conf)
+	db := database.NewPGDB(*conf, logger)
+	a := app.NewApp(db, *conf)
 	router := router.NewRouter(a)
-	if conf.DatabaseDsn != "" {
-		err := database.InitMigrations(conf, logger)
-		if err != nil {
-			logger.Fatalw("can't init migrations", err)
-		}
+
+	err = database.InitMigrations(*conf, logger)
+	if err != nil {
+		logger.Fatalw("can't init migrations", err)
 	}
 
-	server := &http.Server{Addr: conf.ServerAddress, Handler: router}
+	server := &http.Server{Addr: conf.Server.Address, Handler: router}
 	go func() {
-		logger.Infow("Starting http server", "addr", conf.ServerAddress)
+		logger.Infow("Starting http server", "addr", conf.Server.Address)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			logger.Fatalw("create server error: ", err)
 		}

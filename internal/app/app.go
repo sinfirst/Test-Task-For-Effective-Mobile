@@ -7,7 +7,7 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/sinfirst/Test-Task-For-Effective-Mobile/config"
+	"github.com/sinfirst/Test-Task-For-Effective-Mobile/internal/config"
 	"github.com/sinfirst/Test-Task-For-Effective-Mobile/internal/models"
 )
 
