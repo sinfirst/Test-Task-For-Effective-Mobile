@@ -1,0 +1,11 @@
+database:
+  host: "postgres"
+  port: 5432
+  name: "subscriptions"
+  user: "postgres"
+  password: "password"
+
+server:
+  host: "localhost"
+  port: 8080
+
